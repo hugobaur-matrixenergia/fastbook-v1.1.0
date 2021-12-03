@@ -1077,7 +1077,7 @@ def tab_contratos_nova():
 
     from DBO.VW_CE_EXPORTAR_CONTRATOS_MATRIX_NEW AS a
     left join DBO.VW_CE_EXPORTAR_CONTRATOS_GARANTIA  b on  b.Codigo_WBC = a.Codigo_WBC and Year(b.Garantia_periodo_inicial_calculo) = a.Ano
-    where a.nCdEmpresaProprietaria in (3,158,10848, 11356, 11796) and a.Tipo_contrato = 'Bilateral' and a.Situacao = 'Publicado' and a.Ano >= '2021' and a.Portfolio_Vendedor <> 'Cinergy' and a.Portfolio_Comprador <> 'Cinergy'
+    where a.nCdEmpresaProprietaria in (3,158,10848, 11356, 11796) and a.Tipo_contrato = 'Bilateral' and a.Situacao = 'Publicado' and a.Ano >= '2021' and a.Portfolio_Vendedor <> 'Cinergy' and a.Portfolio_Comprador <> 'Cinergy' and a.Portfolio_Vendedor <> 'Zeragem TRIX LP' and a.Portfolio_Comprador <> 'Zeragem TRIX LP' and a.Portfolio_Vendedor <> 'Trading' and a.Portfolio_Comprador <> 'Trading'
     """, cnxn)
 
     # (a.Rateio = 'Não' or (a.Rateio = 'Sim' and a.Nr_contrato_vinculado = NULL)) and
@@ -1319,6 +1319,23 @@ def base_contratos_final(df):
     print('    -contratos_historico - exec_time  = {} seconds '.format(exec_time.seconds))
 
 
+def base_contratos_final_ultima_data(df):
+    init_time = datetime.datetime.now()
+    print('Iniciado insert de dados na tabela historica de contratos ultima data')
+    from sqlalchemy import create_engine
+    engine = create_engine(credenciais)
+    # df = df.dropna(axis=1, how='all')
+    df = df.dropna(axis=0, how='all')
+    df.to_sql(name='contratos_historico_ultima_data', con=engine, if_exists='replace', index=False)
+    end_time = datetime.datetime.now()
+    exec_time = end_time - init_time
+    tempo_exec = []
+    tempo_exec.append(['contratos_historico_ultima_data', exec_time.seconds])
+    df_tempo_exec = pd.DataFrame(tempo_exec, columns=['job', 'time'])
+    tempo_exec_to_azure(df_tempo_exec)
+    print('    -contratos_historico_ultima_data - exec_time  = {} seconds '.format(exec_time.seconds))
+
+
 def base_contratos_wbc(df):
     init_time = datetime.datetime.now()
     print('Iniciado insert dos dados lidos do WBC')
@@ -1367,9 +1384,9 @@ def ler_wbc():
     init_time = datetime.datetime.now()
     print('ler_WBC()')
     df_contratos = tab_contratos_nova()
-    to_csv(df_contratos,
-           CONTRATOS_WBC_CSV)
-    base_contratos_wbc(df_contratos)
+    # to_csv(df_contratos,
+    #        CONTRATOS_WBC_CSV)
+    # base_contratos_wbc(df_contratos)
     montar_tabelas_bases_e_metricas(df_contratos, data_ini_mensal_mkt='2021-01-01', data_fim_mensal_mkt='2023-12-01',
                                     data_ini_anual_mkt='2024-01-01', data_fim_anual_mkt='2045-12-01',
                                     data_reajuste_pld=0)
@@ -1425,19 +1442,19 @@ def montar_tabelas_bases_e_metricas(df_contratos, data_ini_mensal_mkt='2021-01-0
     df_contratos = df_contratos
     # JUROS
     df_juros = tab_juros(PATH)
-    tab_juros_to_azure(df_juros)
+    # tab_juros_to_azure(df_juros)
 
     # MARCAÇÃO
     tabMarcacao_df = tab_marcacao(PATH)
-    tab_marcacao_to_azure(tabMarcacao_df)
+    # tab_marcacao_to_azure(tabMarcacao_df)
 
     # INFLACAO
     df_inflacao = tab_inflacao(PATH)
-    tab_inflacao_to_azure(df_inflacao)
+    # tab_inflacao_to_azure(df_inflacao)
 
     # INFLACAO CENARIO
     df_inflacao_cenario = tab_inflacao_cenario(PATH)
-    tab_inflacao_cenario_to_azure(df_inflacao_cenario)
+    # tab_inflacao_cenario_to_azure(df_inflacao_cenario)
 
     # MKT
     def round_2(x):
@@ -1457,15 +1474,18 @@ def montar_tabelas_bases_e_metricas(df_contratos, data_ini_mensal_mkt='2021-01-0
     df_tab_mkt['Pos'] = df_tab_mkt['Pos'].apply(round_2)
     df_tab_mkt['Pos_infl'] = df_tab_mkt['Pos_infl'].apply(round_2)
     # 'Fixo','Fixo_infl','Pos','Pos_infl'
-    tab_mkt_to_azure(df_tab_mkt)
+    # tab_mkt_to_azure(df_tab_mkt)
 
     # CONTRATOS COM MÉTRICAS
     df_contratos_2 = tab_contratos_nova_metricas(df_contratos, df_tab_mkt, df_juros)
     # tab_contratos_nova_to_csv(df_contratos, PATH)
+    #DERIVATIVOS
+    df_derivativos = derivativos(PATH, df_tab_mkt, df_juros)
+    derivativos_to_azure(df_derivativos)
 
     # ACERTOS NA TABELA DE CONTRATOS
     df_acertos = acertos(PATH)
-    acertos_to_azure(df_acertos)
+    # acertos_to_azure(df_acertos)
     df_contratos_3 = acertos_to_contratos(df_acertos, df_contratos_2)
 
     df_contratos_final = df_contratos_3
@@ -1487,21 +1507,21 @@ def montar_tabelas_bases_e_metricas(df_contratos, data_ini_mensal_mkt='2021-01-0
     df_contratos_final = df_contratos_final.rename(index=str).rename(columns={'Mes_Supri': 'Mes'})
 
     # GUARDAR DADOS FINAIS
-    if csv == 2:
-        base_contratos(df_contratos_final)
+    # if csv == 2:
+    #     base_contratos(df_contratos_final)
 
-    to_csv(df_contratos_final,
-           CONTRATOS_CSV)
-    to_csv(tabMarcacao_df,
-           MARCACAO_CSV)
-    to_csv(df_inflacao_cenario,
-           INFLACAO_CSV)
-    to_csv(df_tab_mkt,
-           MKT_CSV)
-    to_csv(df_acertos,
-           ACERTOS_CSV)
-    to_csv(df_juros,
-           JUROS_CSV)
+    # to_csv(df_contratos_final,
+    #        CONTRATOS_CSV)
+    # to_csv(tabMarcacao_df,
+    #        MARCACAO_CSV)
+    # to_csv(df_inflacao_cenario,
+    #        INFLACAO_CSV)
+    # to_csv(df_tab_mkt,
+    #        MKT_CSV)
+    # to_csv(df_acertos,
+    #        ACERTOS_CSV)
+    # to_csv(df_juros,
+    #        JUROS_CSV)
 
     end_time = datetime.datetime.now()
     exec_time = end_time - init_time
@@ -1543,7 +1563,86 @@ def ler_excel(PATH, sheet):
     return df
 
 
+# v1.1.0
+def derivativos(PATH, df_tab_mkt, df_juros):
+
+    init_time = datetime.datetime.now()
+    df_derivativos = pd.read_excel(PATH, sheet_name="Derivativos",)
+    df_derivativos = df_derivativos.dropna(axis=1, how='all')
+    df_derivativos = df_derivativos.dropna(axis=0, how='all')
+    df_derivativos = df_derivativos.dropna(axis=0, how='any')
+
+    df_derivativos = metricas_derivativos(df_derivativos, df_tab_mkt, df_juros)
+
+    end_time = datetime.datetime.now()
+    exec_time = end_time - init_time
+    tempo_exec = []
+    tempo_exec.append(['tab_derivativos', exec_time.seconds])
+    df_tempo_exec = pd.DataFrame(tempo_exec, columns=['job', 'time'])
+    tempo_exec_to_azure(df_tempo_exec)
+    print('Derivativos - exec_time  = {} seconds '.format(exec_time.seconds))
+    return df_derivativos
+
+
+def metricas_derivativos(df, df_tab_mkt, df_juros):
+
+    df['Mes'] = df.Mes.map("{:02}".format)
+
+    df['Chave'] = ('BASE') +  df['Ano'].map(str) + df['Mes'].map(str) + \
+                                 df['Submercado'].map(str) + df['Tipo_Energia'].map(str)
+    df['Vol_MWm'] = df['Vol_MWh'] / df['Horas_Mes']
+
+    df['Year_Month'] = df['Ano'].map(str) + '-' + df['Mes'].map(str)
+
+    df2 = df.merge(df_tab_mkt, left_on='Chave', right_on='Chave', how='left')
+
+    df2['Valor_MKT'] = np.where(df2['Ano_x'].map(int) <= datetime.datetime.today().year, df2['PLD'], df2['Fixo_infl'])
+
+    df2['ChaveJuros'] = df2['Year_Month'] + '-01'
+    df2['ChaveJuros'] = pd.to_datetime(df2['ChaveJuros'])
+    df2['ChaveJuros'] = df2['ChaveJuros'] + pd.DateOffset(months=1)
+    df2['ChaveJuros'] = df2['ChaveJuros'].astype(str)
+    df3 = df2.merge(df_juros, left_on='ChaveJuros', right_on='AnoMes', how='left')
+
+    df3['Data_Vencimento_aux'] = df3['Data_Vencimento'].apply(lambda dt: dt.replace(day=1))
+    df3['Data_Vencimento_aux'] = df3['Data_Vencimento_aux'].astype(str)
+    df4 = df3.merge(df_juros, left_on='Data_Vencimento_aux', right_on='AnoMes', how='left')
+
+    df4['MTM_Value'] = np.where(df4['Movimentacao'] == 'Compra',
+                                ((df4['Vol_MWh'] * ((df4['Valor_MKT']) - df4['Valor_Reajustado']))),
+                                (df4['Vol_MWh'] * (df4['Valor_Reajustado'] - df4['Valor_MKT'])))
+    df4['Notional'] = abs(df4['MTM_Value'])
+    df4['NPV_MTM'] = np.where(df4['Movimentacao'] == 'Compra', (df4['Vol_MWh'] * df4['Valor_MKT'] / df4['Fator_Reducao_y']) -
+                                               (df4['Vol_MWh'] * df4['Valor_Reajustado'] / df4['Fator_Reducao_x']),
+                                               (df4['Vol_MWh'] * df4['Valor_Reajustado'] / df4['Fator_Reducao_x']) -
+                                               (df4['Vol_MWh'] * df4['Valor_MKT'] / df4['Fator_Reducao_y']))
+
+    del df4['Ano_y']
+    del df4['Mes_y']
+    del df4['Energia']
+    del df4['Submercado_y']
+    df4 = df4.rename(index=str).rename(columns={'Submercado_x': 'Submercado'})
+    df4 = df4.rename(index=str).rename(columns={'Ano_x': 'Ano'})
+    df4 = df4.rename(index=str).rename(columns={'Mes_x': 'Mes'})
+
+    return df4
+
+
+def derivativos_to_azure(df):
+    init_time = datetime.datetime.now()
+    from sqlalchemy import create_engine
+    engine = create_engine(credenciais)
+    df.to_sql(name='derivativos', con=engine, if_exists='replace', index=False)
+    end_time = datetime.datetime.now()
+    exec_time = end_time - init_time
+    tempo_exec = []
+    tempo_exec.append(['derivativos_to_azure', exec_time.seconds])
+    df_tempo_exec = pd.DataFrame(tempo_exec, columns=['job', 'time'])
+    tempo_exec_to_azure(df_tempo_exec)
+    print('derivativos_to_azure - exec_time  = {} seconds '.format(exec_time.seconds))
+
+
 if __name__ == '__main__':
-    # ler_wbc()
-    sincronizar_csv()
+    ler_wbc()
+    # sincronizar_csv()
     # sincronizar()
